@@ -350,12 +350,12 @@ footer{border-top:1px solid var(--line);padding:36px 0 44px;background:var(--bg2
 =========================================================== -->
 <script>
 const LONG_FORM_VIDEOS = [
-  "https://youtu.be/MzPT1IkF9sQ",
+  "https://youtu.be/zcJ4CXAIMzU",
   "https://youtu.be/0EL79dhgl3A",
   "https://youtu.be/3UayGDJSBW8",
   "https://youtu.be/JEz1C68N8Rk",
   "https://youtu.be/sUSyNTYiSYg",
-  "https://youtu.be/zcJ4CXAIMzU",
+  "https://youtu.be/MzPT1IkF9sQ",
 ];
 const SHORT_FORM_VIDEOS = [
   "https://youtube.com/shorts/KBUHDIZBcuE",
@@ -646,7 +646,34 @@ const CLIENTS = [
         + '</article>';
     }).join('');
   }
-  /* shorts loop bar: cards are duplicated so the loop is seamless */
+  /* seamless loop builder — repeats the content enough times that the
+     -50% loop never shows empty space, on any screen width. Rebuilds
+     itself when the window is resized. */
+  var loopRebuilds = [];
+  function buildLoop(track, setHTML, setClass, speed){
+    function build(){
+      track.innerHTML = '<div class="'+setClass+'">' + setHTML + '</div>';
+      if (reduce){ track.parentElement.style.overflowX = 'auto'; return; }
+      var W = track.firstElementChild.getBoundingClientRect().width || 1;
+      var V = track.parentElement.getBoundingClientRect().width || window.innerWidth;
+      var copies = Math.max(2, 2 * Math.ceil(V / W));
+      var html = '';
+      for (var i = 0; i < copies; i++){
+        html += '<div class="'+setClass+'"'+(i ? ' aria-hidden="true"' : '')+'>' + setHTML + '</div>';
+      }
+      track.innerHTML = html;
+      track.style.animationDuration = ((W * copies / 2) / speed) + 's';
+    }
+    build();
+    loopRebuilds.push(build);
+  }
+  var resizeT;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeT);
+    resizeT = setTimeout(function(){ loopRebuilds.forEach(function(f){ f(); }); }, 200);
+  });
+
+  /* shorts loop bar */
   var shortsTrack = document.getElementById('shortsTrack');
   if (shortsTrack && typeof SHORT_FORM_VIDEOS !== 'undefined'){
     var sCards = SHORT_FORM_VIDEOS.map(function(u,i){
@@ -658,13 +685,7 @@ const CLIENTS = [
         + '</div>'
         + '</article>';
     }).join('');
-    if (reduce){
-      shortsTrack.innerHTML = '<div class="s-set">' + sCards + '</div>';
-      shortsTrack.parentElement.style.overflowX = 'auto';
-    } else {
-      shortsTrack.innerHTML = '<div class="s-set">' + sCards + '</div>'
-        + '<div class="s-set" aria-hidden="true">' + sCards + '</div>';
-    }
+    buildLoop(shortsTrack, sCards, 's-set', 42);
   }
 
   /* client bar */
@@ -684,13 +705,7 @@ const CLIENTS = [
         + '<div><b>'+c.name+'</b><small>'+c.stat+'</small></div>'
         + '</a>';
     }).join('');
-    if (reduce){
-      clientTrack.innerHTML = '<div class="m-set">' + cCards + '</div>';
-      clientTrack.parentElement.style.overflowX = 'auto';
-    } else {
-      clientTrack.innerHTML = '<div class="m-set">' + cCards + '</div>'
-        + '<div class="m-set" aria-hidden="true">' + cCards + '</div>';
-    }
+    buildLoop(clientTrack, cCards, 'm-set', 45);
   }
 
   /* ---- scroll playhead + timecode ---- */
@@ -756,16 +771,17 @@ const CLIENTS = [
   lb.addEventListener('click', function(e){ if(e.target === lb) closeLb(); });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !lb.hidden) closeLb(); });
 
-  /* ---- click-to-play: long-form plays in place, shorts open the lightbox ---- */
-  document.querySelectorAll('.video[data-yt]').forEach(function(v){
-    v.addEventListener('click', function(){
-      var id = v.dataset.yt;
-      if (v.classList.contains('video--vert')){ openLb(id); return; }
-      if (v.dataset.loaded) return;
-      v.dataset.loaded = '1';
-      v.innerHTML = '';
-      v.appendChild(makeIframe(id));
-    });
+  /* ---- click-to-play: long-form plays in place, shorts open the lightbox.
+     One listener for the whole page, so cards rebuilt on resize still work. ---- */
+  document.addEventListener('click', function(e){
+    var v = e.target.closest('.video[data-yt]');
+    if (!v) return;
+    var id = v.dataset.yt;
+    if (v.classList.contains('video--vert')){ openLb(id); return; }
+    if (v.dataset.loaded) return;
+    v.dataset.loaded = '1';
+    v.innerHTML = '';
+    v.appendChild(makeIframe(id));
   });
 })();
 </script>
